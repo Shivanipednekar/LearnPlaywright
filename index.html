@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Playwright Quest – Learn Playwright JS</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --sky: #5c94fc;
+  --ground: #c8a050;
+  --grass: #5dc44a;
+  --brick: #c0392b;
+  --gold: #e8b800;
+  --white: #fff;
+  --dark: #1a0a2e;
+  --green: #27ae60;
+  --red: #e74c3c;
+  --blue: #2980b9;
+  --code-bg: #0d1117;
+  --code-text: #e6edf3;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--dark);
+  font-family: 'Press Start 2P', monospace;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HUD ── */
+#hud {
+  background: linear-gradient(180deg,#000 0%,#1a0a2e 100%);
+  border-bottom: 3px solid var(--gold);
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--white);
+  flex-shrink: 0;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hud-pill {
+  background: rgba(255,255,255,0.08);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  padding: 6px 14px;
+  text-shadow: 1px 1px #000;
+  white-space: nowrap;
+}
+#progress-bar-wrap {
+  flex:1; min-width:120px; max-width:300px;
+  height:14px;
+  background:#111;
+  border:2px solid var(--gold);
+  border-radius:8px;
+  overflow:hidden;
+}
+#progress-bar {
+  height:100%;
+  background: linear-gradient(90deg,#27ae60,#f1c40f);
+  transition: width 0.5s ease;
+  border-radius:8px;
+}
+
+/* ── CANVAS (background world) ── */
+#worldCanvas {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ── MAIN LAYOUT ── */
+#game {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── LEVEL PANEL ── */
+#levelPanel {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  gap: 10px;
+}
+
+/* ── TOPIC BADGE ── */
+#topicBadge {
+  background: var(--brick);
+  border: 3px solid var(--gold);
+  border-radius: 12px;
+  padding: 8px 20px;
+  font-size: 9px;
+  color: var(--gold);
+  letter-spacing: 2px;
+  text-shadow: 1px 1px #000;
+  text-transform: uppercase;
+}
+
+/* ── QUESTION ── */
+#questionBox {
+  background: rgba(0,0,0,0.85);
+  border: 3px solid var(--gold);
+  border-radius: 14px;
+  padding: 14px 20px;
+  max-width: 820px;
+  width: 100%;
+  color: var(--white);
+  font-size: 9px;
+  line-height: 1.9;
+  text-align: center;
+  text-shadow: 1px 1px #000;
+}
+
+/* ── CODE BLOCK ── */
+.code-block {
+  background: var(--code-bg);
+  border: 2px solid #30363d;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 8px auto;
+  max-width: 780px;
+  width: 100%;
+  text-align: left;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--code-text);
+  overflow-x: auto;
+  white-space: pre;
+  position: relative;
+  z-index:5;
+}
+.kw  { color:#ff7b72; }
+.fn  { color:#d2a8ff; }
+.str { color:#a5d6ff; }
+.cmt { color:#8b949e; font-style:italic; }
+.var { color:#ffa657; }
+.num { color:#79c0ff; }
+
+/* ── ANSWERS GRID ── */
+#answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 820px;
+  width: 100%;
+}
+.ans-btn {
+  background: rgba(41,128,185,0.2);
+  border: 2.5px solid var(--blue);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--white);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  line-height: 1.5;
+}
+.ans-btn:hover { background: rgba(41,128,185,0.5); transform: scale(1.02); border-color:#5dade2; }
+.ans-btn.correct { background:rgba(39,174,96,0.4); border-color:#27ae60; animation: pop 0.3s; }
+.ans-btn.wrong   { background:rgba(231,76,60,0.4);  border-color:#e74c3c; animation: shake 0.3s; }
+@keyframes pop   { 0%{transform:scale(1)} 50%{transform:scale(1.06)} 100%{transform:scale(1)} }
+@keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} 100%{transform:translateX(0)} }
+
+/* ── EXPLANATION ── */
+#explanation {
+  display: none;
+  background: rgba(0,20,0,0.92);
+  border: 2.5px solid var(--green);
+  border-radius: 12px;
+  padding: 12px 18px;
+  max-width: 820px;
+  width: 100%;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: #aaffaa;
+  line-height: 1.7;
+  z-index: 5;
+}
+#explanation.show { display: block; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── NEXT BTN ── */
+#nextBtn {
+  display: none;
+  background: var(--gold);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 30px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  animation: pulse 1s infinite;
+  z-index: 5;
+}
+#nextBtn.show { display: block; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 #e8b80066} 50%{box-shadow:0 0 0 8px #e8b80000} }
+#nextBtn:hover { transform:scale(1.05); background:#f5d020; }
+
+/* ── TITLE SCREEN ── */
+#titleScreen {
+  position: fixed; inset: 0;
+  background: linear-gradient(180deg,#1a0a2e 0%,#0d0520 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; z-index: 100;
+}
+#titleScreen h1 {
+  font-size: clamp(18px,3.5vw,38px);
+  color: var(--gold);
+  text-shadow: 3px 3px #000, 0 0 30px #e8b800;
+  text-align: center;
+  line-height: 1.6;
+}
+#titleScreen .sub {
+  font-size: clamp(7px,1.5vw,11px);
+  color: #adf;
+  text-align: center;
+  line-height: 2;
+}
+#titleScreen .topics {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  max-width: 700px;
+}
+.topic-chip {
+  background: rgba(255,255,255,0.08);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 8px;
+  color: var(--white);
+}
+#startBtn {
+  background: var(--green);
+  color: #fff;
+  border: 3px solid #aeffae;
+  border-radius: 12px;
+  padding: 14px 36px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  animation: pulse 1s infinite;
+  margin-top: 8px;
+}
+#startBtn:hover { transform: scale(1.05); }
+
+/* ── WIN SCREEN ── */
+#winScreen {
+  position: fixed; inset: 0;
+  background: rgba(0,20,0,0.95);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; z-index: 100; color: #fff;
+}
+#winScreen h1 { font-size: clamp(20px,4vw,42px); color: #f1c40f; text-shadow: 0 0 20px #f1c40f; }
+#winScreen .score-card {
+  background: rgba(0,0,0,0.5);
+  border: 3px solid var(--gold);
+  border-radius: 14px;
+  padding: 20px 40px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 2.4;
+}
+#restartBtn {
+  background: var(--gold); color:#000;
+  border: none; border-radius:10px;
+  padding:12px 28px;
+  font-family:'Press Start 2P',monospace;
+  font-size:11px; cursor:pointer;
+}
+
+/* ── FEEDBACK TOAST ── */
+#toast {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+  padding: 10px 24px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: 'Press Start 2P', monospace;
+  color: #fff;
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  text-shadow: 1px 1px #000;
+  white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+#toast.good { background: rgba(39,174,96,0.95); border:2px solid #aeffae; }
+#toast.bad  { background: rgba(231,76,60,0.95);  border:2px solid #ffaaaa; }
+
+/* ── MARIO SPRITE (CSS) ── */
+#marioSprite {
+  position: absolute;
+  bottom: 72px;
+  left: 60px;
+  width: 40px;
+  height: 60px;
+  z-index: 10;
+  transition: left 0.3s;
+  image-rendering: pixelated;
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  #answers { grid-template-columns: 1fr; }
+  .hud-pill { font-size:8px; padding:4px 8px; }
+}
+
+/* ── CHEATSHEET TOGGLE ── */
+#cheatToggle {
+  position: fixed; bottom: 16px; right: 16px;
+  background: var(--blue); color:#fff;
+  border: 2px solid #adf; border-radius:10px;
+  padding: 8px 14px; font-family:'Press Start 2P',monospace;
+  font-size:8px; cursor:pointer; z-index:50;
+}
+#cheatSheet {
+  position: fixed; bottom: 60px; right: 16px;
+  background: rgba(0,0,0,0.97); border:2px solid var(--blue);
+  border-radius:12px; padding:16px; z-index:50;
+  font-family:'Share Tech Mono',monospace; font-size:12px;
+  color:#adf; max-width:340px; line-height:1.8;
+  display:none;
+}
+#cheatSheet h3 { color:var(--gold); font-family:'Press Start 2P',monospace; font-size:9px; margin-bottom:10px; }
+#cheatSheet.open { display:block; }
+
+/* lives hearts */
+.heart { color:#e74c3c; font-size:14px; }
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-pill">🎮 PLAYWRIGHT QUEST</div>
+  <div class="hud-pill">⭐ <span id="scoreDisp">0</span></div>
+  <div id="progress-bar-wrap"><div id="progress-bar" style="width:0%"></div></div>
+  <div class="hud-pill">Q <span id="qNum">1</span>/<span id="qTotal">?</span></div>
+  <div class="hud-pill" id="livesDisp">❤️❤️❤️</div>
+</div>
+
+<!-- Game area -->
+<div id="game">
+  <canvas id="worldCanvas"></canvas>
+
+  <!-- Mario sprite (CSS drawn via canvas) -->
+  <canvas id="marioSprite" width="40" height="60"></canvas>
+
+  <div id="levelPanel">
+    <div id="topicBadge">LEVEL 1 – TOPIC</div>
+    <div id="questionBox">Loading…</div>
+    <div class="code-block" id="codeBlock" style="display:none"></div>
+    <div id="answers"></div>
+    <div id="explanation"></div>
+    <button id="nextBtn">NEXT ▶</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Cheat Sheet -->
+<button id="cheatToggle">📋 QUICK REF</button>
+<div id="cheatSheet">
+  <h3>⚡ PLAYWRIGHT CHEATSHEET</h3>
+  <b style="color:#f1c40f">Setup</b><br>
+  npm init playwright@latest<br><br>
+  <b style="color:#f1c40f">Navigate</b><br>
+  await page.goto('url')<br><br>
+  <b style="color:#f1c40f">Locate</b><br>
+  page.getByRole('button',{name:'Submit'})<br>
+  page.getByText('Login')<br>
+  page.getByLabel('Email')<br>
+  page.getByPlaceholder('Search')<br>
+  page.locator('#id .class')<br><br>
+  <b style="color:#f1c40f">Actions</b><br>
+  await locator.click()<br>
+  await locator.fill('text')<br>
+  await locator.press('Enter')<br>
+  await locator.selectOption('val')<br><br>
+  <b style="color:#f1c40f">Assertions</b><br>
+  await expect(loc).toBeVisible()<br>
+  await expect(loc).toHaveText('x')<br>
+  await expect(page).toHaveURL('x')<br><br>
+  <b style="color:#f1c40f">Waits</b><br>
+  await page.waitForURL('url')<br>
+  await loc.waitFor()<br><br>
+  <b style="color:#f1c40f">Misc</b><br>
+  await page.screenshot({path:'x.png'})<br>
+  await page.evaluate(() => ...)<br>
+</div>
+
+<!-- Title Screen -->
+<div id="titleScreen">
+  <h1>🎭 PLAYWRIGHT QUEST</h1>
+  <div class="sub">
+    Learn Playwright JS through an epic Mario adventure!<br>
+    Answer challenges to advance through the levels.
+  </div>
+  <div class="topics">
+    <div class="topic-chip">🚀 Setup & Install</div>
+    <div class="topic-chip">🧭 Navigation</div>
+    <div class="topic-chip">🔍 Locators</div>
+    <div class="topic-chip">🖱️ Actions</div>
+    <div class="topic-chip">✅ Assertions</div>
+    <div class="topic-chip">⏳ Waits</div>
+    <div class="topic-chip">📸 Screenshots</div>
+    <div class="topic-chip">🧪 Test Structure</div>
+    <div class="topic-chip">🔁 Hooks</div>
+    <div class="topic-chip">🏷️ Tags & Filters</div>
+  </div>
+  <button id="startBtn">▶ START QUEST</button>
+</div>
+
+<!-- Win Screen -->
+<div id="winScreen">
+  <h1>🏆 QUEST COMPLETE!</h1>
+  <div class="score-card" id="winCard"></div>
+  <button id="restartBtn">🔄 PLAY AGAIN</button>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  QUESTIONS DATABASE
+// ════════════════════════════════════════════════════════════════
+const QUESTIONS = [
+  // ── SETUP ──
+  {
+    level: "🚀 SETUP & INSTALL",
+    q: "How do you install Playwright and set up a new project from scratch?",
+    code: null,
+    options: [
+      "npm init playwright@latest",
+      "npm install playwright",
+      "npx playwright install",
+      "yarn add @playwright/test"
+    ],
+    answer: 0,
+    explain: "✅  'npm init playwright@latest' is the official scaffolding command. It installs browsers, creates playwright.config.js, and generates a sample test — all in one step!\n\n  'npm install playwright' only installs the library.\n  'npx playwright install' only installs browsers (used after the main setup)."
+  },
+  {
+    level: "🚀 SETUP & INSTALL",
+    q: "After init, which command RUNS all your tests?",
+    code: null,
+    options: [
+      "npx playwright test",
+      "npm test run",
+      "playwright run --all",
+      "npx pw test"
+    ],
+    answer: 0,
+    explain: "✅  'npx playwright test' is THE command. Add flags like:\n  --headed      → see the browser\n  --ui          → open the cool UI mode\n  --debug       → step-through debugger\n  --grep @smoke → run only tagged tests"
+  },
+
+  // ── NAVIGATION ──
+  {
+    level: "🧭 NAVIGATION",
+    q: "How do you navigate to a URL in Playwright?",
+    code: `<span class="kw">const</span> <span class="var">{ test, expect }</span> = require(<span class="str">'@playwright/test'</span>);
+
+test(<span class="str">'navigate to Google'</span>, <span class="kw">async</span> ({ <span class="var">page</span> }) => {
+  <span class="cmt">// ← What goes here?</span>
+  <span class="kw">await</span> expect(<span class="var">page</span>).toHaveURL(<span class="str">'https://google.com'</span>);
+});`,
+    options: [
+      "await page.goto('https://google.com')",
+      "await page.open('https://google.com')",
+      "page.navigate('https://google.com')",
+      "await browser.go('https://google.com')"
+    ],
+    answer: 0,
+    explain: "✅  page.goto(url) is the navigation method in Playwright.\n\n  It waits for the page to load (networkidle or load event) by default.\n  You can pass options: await page.goto(url, { waitUntil: 'networkidle' })"
+  },
+  {
+    level: "🧭 NAVIGATION",
+    q: "page.goto() returns a Promise. What does it resolve to?",
+    code: `<span class="kw">const</span> <span class="var">response</span> = <span class="kw">await</span> <span class="var">page</span>.goto(<span class="str">'https://example.com'</span>);
+console.log(<span class="var">response</span>.status()); <span class="cmt">// prints what?</span>`,
+    options: [
+      "The HTTP Response object (status, headers, etc.)",
+      "The page HTML as a string",
+      "A boolean true/false",
+      "Nothing (void)"
+    ],
+    answer: 0,
+    explain: "✅  page.goto() resolves to a Response object!\n  response.status()  → HTTP status code (200, 404 …)\n  response.ok()      → true if 200-299\n  response.url()     → final URL after redirects\n\n  Very useful for asserting your page loaded successfully."
+  },
+
+  // ── LOCATORS ──
+  {
+    level: "🔍 LOCATORS",
+    q: "Which locator is BEST for finding a button with the text 'Submit'?",
+    code: `<span class="cmt">// HTML:</span>  &lt;button&gt;Submit&lt;/button&gt;
+
+<span class="cmt">// Choose the best Playwright locator:</span>`,
+    options: [
+      "page.getByRole('button', { name: 'Submit' })",
+      "page.locator('button')",
+      "page.locator('button:contains(\"Submit\")')",
+      "page.find('Submit')"
+    ],
+    answer: 0,
+    explain: "✅  getByRole() is the RECOMMENDED approach!\n\n  It mirrors how users and screen-readers interact with your UI:\n  → getByRole('button', {name:'Submit'}) ✅\n  → getByRole('link', {name:'Home'})     ✅\n  → getByRole('textbox', {name:'Email'}) ✅\n\n  It's resilient — doesn't break when you change CSS classes."
+  },
+  {
+    level: "🔍 LOCATORS",
+    q: "What is the correct locator to find an input by its LABEL text?",
+    code: `<span class="cmt">// HTML:</span>
+&lt;<span class="kw">label</span> for=<span class="str">"email"</span>&gt;Email Address&lt;/label&gt;
+&lt;<span class="kw">input</span> id=<span class="str">"email"</span> type=<span class="str">"email"</span>/&gt;`,
+    options: [
+      "page.getByLabel('Email Address')",
+      "page.locator('#email')",
+      "page.getByText('Email Address')",
+      "page.getByName('email')"
+    ],
+    answer: 0,
+    explain: "✅  page.getByLabel('Email Address') finds the INPUT associated with that label.\n\n  It automatically resolves the for/id link — super handy!\n  This is the best practice: tests should use accessible labels,\n  not internal IDs that might change."
+  },
+  {
+    level: "🔍 LOCATORS",
+    q: "Which locator do you use for elements identified ONLY by CSS or XPath?",
+    code: `<span class="cmt">// HTML:</span>  &lt;div class=<span class="str">"product-card"</span>&gt;&lt;/div&gt;
+
+<span class="cmt">// Playwright locator for class-based selection:</span>`,
+    options: [
+      "page.locator('.product-card')",
+      "page.getByClass('product-card')",
+      "page.findElement('.product-card')",
+      "page.css('.product-card')"
+    ],
+    answer: 0,
+    explain: "✅  page.locator() accepts ANY CSS selector or XPath:\n  page.locator('.product-card')       → by class\n  page.locator('#submit-btn')          → by id\n  page.locator('div > span.price')     → complex CSS\n  page.locator('xpath=//button[@id]')  → XPath\n\n  Use it when semantic locators (getByRole etc.) aren't available."
+  },
+  {
+    level: "🔍 LOCATORS",
+    q: "How do you get the THIRD item in a list of matching elements?",
+    code: `<span class="cmt">// HTML has 5 &lt;li&gt; elements, you want the 3rd</span>
+<span class="kw">const</span> <span class="var">items</span> = <span class="var">page</span>.locator(<span class="str">'li'</span>);
+<span class="cmt">// Get the 3rd item:</span>`,
+    options: [
+      "items.nth(2)  // 0-indexed",
+      "items.get(3)  // 1-indexed",
+      "items[2]",
+      "items.item(3)"
+    ],
+    answer: 0,
+    explain: "✅  locator.nth(index) — 0-indexed, so nth(0)=first, nth(2)=third.\n\n  Other useful helpers:\n  items.first()      → first element\n  items.last()       → last element\n  items.nth(2)       → third element\n  await items.count() → how many found"
+  },
+
+  // ── ACTIONS ──
+  {
+    level: "🖱️ ACTIONS",
+    q: "How do you type text into an input field and CLEAR it first?",
+    code: `<span class="kw">const</span> <span class="var">input</span> = <span class="var">page</span>.getByLabel(<span class="str">'Username'</span>);
+<span class="cmt">// Type 'admin' — clearing any existing value:</span>`,
+    options: [
+      "await input.fill('admin')",
+      "await input.type('admin')",
+      "await input.sendKeys('admin')",
+      "await input.setValue('admin')"
+    ],
+    answer: 0,
+    explain: "✅  fill() clears the field first, then types — perfect for form inputs!\n\n  fill() vs type():\n  → fill('text')  — clears + types at once (RECOMMENDED)\n  → type('text')  — types character by character (simulates keystrokes)\n\n  Use type() when you want to test autocomplete or key-press events."
+  },
+  {
+    level: "🖱️ ACTIONS",
+    q: "How do you simulate pressing the ENTER key on a focused element?",
+    code: `<span class="kw">const</span> <span class="var">searchBox</span> = <span class="var">page</span>.getByRole(<span class="str">'searchbox'</span>);
+<span class="kw">await</span> <span class="var">searchBox</span>.fill(<span class="str">'Playwright'</span>);
+<span class="cmt">// Now press Enter:</span>`,
+    options: [
+      "await searchBox.press('Enter')",
+      "await searchBox.keydown('Enter')",
+      "await page.keyboard.press('Enter')",
+      "Both A and C are correct"
+    ],
+    answer: 3,
+    explain: "✅  BOTH work!\n  → locator.press('Enter')        — press on a specific element\n  → page.keyboard.press('Enter')  — global keyboard press\n\n  Other useful keys:\n  press('Tab')     → move focus\n  press('Escape')  → close dialogs\n  press('Control+A') → select all\n  press('ArrowDown') → navigate dropdowns"
+  },
+  {
+    level: "🖱️ ACTIONS",
+    q: "How do you select an option from a <select> dropdown?",
+    code: `<span class="cmt">// HTML:</span>
+&lt;<span class="kw">select</span> id=<span class="str">"country"</span>&gt;
+  &lt;<span class="kw">option</span> value=<span class="str">"in"</span>&gt;India&lt;/option&gt;
+  &lt;<span class="kw">option</span> value=<span class="str">"us"</span>&gt;USA&lt;/option&gt;
+&lt;/select&gt;`,
+    options: [
+      "await page.locator('#country').selectOption('in')",
+      "await page.locator('#country').fill('India')",
+      "await page.locator('#country').click('India')",
+      "await page.locator('#country').choose({ value: 'in' })"
+    ],
+    answer: 0,
+    explain: "✅  selectOption() is the dedicated dropdown method:\n  .selectOption('in')          → by value\n  .selectOption('India')       → by label\n  .selectOption({ index: 0 })  → by index\n  .selectOption(['a','b'])     → multi-select"
+  },
+
+  // ── ASSERTIONS ──
+  {
+    level: "✅ ASSERTIONS",
+    q: "How do you assert that an element is VISIBLE on the page?",
+    code: `<span class="kw">const</span> <span class="var">banner</span> = <span class="var">page</span>.getByText(<span class="str">'Welcome, Shivani!'</span>);
+<span class="cmt">// Assert it's visible:</span>`,
+    options: [
+      "await expect(banner).toBeVisible()",
+      "await expect(banner).isVisible()",
+      "assert(await banner.visible())",
+      "expect(banner).toBeTruthy()"
+    ],
+    answer: 0,
+    explain: "✅  Playwright's expect() has auto-retrying assertions!\n\n  await expect(locator).toBeVisible()  ← waits up to 5s for element to appear\n  await expect(locator).toBeHidden()   ← wait for it to disappear\n  await expect(locator).toBeEnabled()  ← for buttons/inputs\n  await expect(locator).toBeChecked()  ← for checkboxes\n\n  The auto-retry makes your tests WAY more stable!"
+  },
+  {
+    level: "✅ ASSERTIONS",
+    q: "How do you assert the text content of an element?",
+    code: `<span class="cmt">// HTML:</span>  &lt;h1&gt;Order Confirmed&lt;/h1&gt;
+
+<span class="kw">const</span> <span class="var">heading</span> = <span class="var">page</span>.getByRole(<span class="str">'heading'</span>);
+<span class="cmt">// Assert text:</span>`,
+    options: [
+      "await expect(heading).toHaveText('Order Confirmed')",
+      "await expect(heading).toEqual('Order Confirmed')",
+      "assert(heading.text === 'Order Confirmed')",
+      "await expect(heading).textContent('Order Confirmed')"
+    ],
+    answer: 0,
+    explain: "✅  toHaveText() checks the text content:\n  .toHaveText('Order Confirmed')    → exact match\n  .toHaveText(/confirmed/i)          → regex (partial, case-insensitive)\n  .toContainText('Order')            → contains substring\n\n  Regex is very powerful for dynamic text like 'Order #12345 Confirmed'."
+  },
+  {
+    level: "✅ ASSERTIONS",
+    q: "How do you assert the current page URL?",
+    code: `<span class="cmt">// After login, user should be at /dashboard</span>
+<span class="kw">await</span> <span class="var">page</span>.goto(<span class="str">'/login'</span>);
+<span class="kw">await</span> <span class="var">page</span>.getByLabel(<span class="str">'Password'</span>).fill(<span class="str">'secret'</span>);
+<span class="kw">await</span> <span class="var">page</span>.getByRole(<span class="str">'button'</span>, {<span class="var">name</span>:<span class="str">'Login'</span>}).click();
+<span class="cmt">// Assert URL:</span>`,
+    options: [
+      "await expect(page).toHaveURL('/dashboard')",
+      "await expect(page.url()).toEqual('/dashboard')",
+      "assert(page.currentURL === '/dashboard')",
+      "await page.assertURL('/dashboard')"
+    ],
+    answer: 0,
+    explain: "✅  expect(page).toHaveURL() — works on the PAGE object, not a locator!\n\n  Accepts string or regex:\n  .toHaveURL('/dashboard')          → exact path\n  .toHaveURL(/dashboard/)           → regex\n  .toHaveURL('https://...')         → full URL\n\n  This auto-retries too, so it handles redirects gracefully."
+  },
+
+  // ── WAITS ──
+  {
+    level: "⏳ WAITS",
+    q: "What's the CORRECT way to wait for an API call to finish before asserting?",
+    code: `<span class="cmt">// Click 'Save', wait for POST /api/orders to complete</span>
+<span class="kw">const</span> <span class="var">responsePromise</span> = <span class="var">page</span>.waitForResponse(<span class="str">'/api/orders'</span>);
+<span class="kw">await</span> <span class="var">page</span>.getByRole(<span class="str">'button'</span>, {<span class="var">name</span>:<span class="str">'Save'</span>}).click();
+<span class="cmt">// Now wait for the response:</span>`,
+    options: [
+      "const response = await responsePromise;",
+      "await page.sleep(3000);",
+      "await page.waitForTimeout(3000);",
+      "await page.networkIdle();"
+    ],
+    answer: 0,
+    explain: "✅  The Promise pattern is the RIGHT way to wait for network!\n\n  NEVER use page.waitForTimeout(ms) in real tests — it's a hardcoded sleep. Flaky and slow!\n\n  Correct patterns:\n  page.waitForResponse(url)   → wait for specific API call\n  page.waitForRequest(url)    → wait for a request to be sent\n  locator.waitFor()           → wait for element to appear\n  page.waitForURL(url)        → wait for navigation"
+  },
+  {
+    level: "⏳ WAITS",
+    q: "Playwright auto-waits. What does this mean?",
+    code: `<span class="cmt">// No explicit waits here — will this work?</span>
+<span class="kw">await</span> <span class="var">page</span>.goto(<span class="str">'https://shop.example.com'</span>);
+<span class="kw">await</span> <span class="var">page</span>.getByRole(<span class="str">'button'</span>, {<span class="var">name</span>:<span class="str">'Add to Cart'</span>}).click();`,
+    options: [
+      "Playwright waits for the button to be visible & enabled before clicking",
+      "It clicks immediately — may fail if button isn't ready",
+      "You must add await page.waitForSelector('button') first",
+      "Auto-wait only works with getByRole, not locator()"
+    ],
+    answer: 0,
+    explain: "✅  Auto-wait is Playwright's SUPERPOWER!\n\n  Before every action, Playwright automatically waits for:\n  ✔ Element to be attached to DOM\n  ✔ Element to be visible\n  ✔ Element to be stable (no animation)\n  ✔ Element to be enabled\n  ✔ Element to be in viewport\n\n  This is why Playwright tests are more stable than Selenium!"
+  },
+
+  // ── SCREENSHOTS ──
+  {
+    level: "📸 SCREENSHOTS",
+    q: "How do you take a full-page screenshot and save it?",
+    code: `<span class="cmt">// Take screenshot of entire page:</span>`,
+    options: [
+      "await page.screenshot({ path: 'screenshot.png', fullPage: true })",
+      "await page.capture('screenshot.png')",
+      "await page.screenshot('screenshot.png')",
+      "await browser.takeScreenshot({ fullPage: true })"
+    ],
+    answer: 0,
+    explain: "✅  page.screenshot() options:\n  { path: 'file.png' }         → save to file\n  { fullPage: true }           → capture full scrollable page\n  { clip: {x,y,width,height}} → capture region\n\n  Element screenshots:\n  await locator.screenshot({ path: 'element.png' })\n\n  Visual comparison:\n  await expect(page).toHaveScreenshot('baseline.png')"
+  },
+
+  // ── TEST STRUCTURE ──
+  {
+    level: "🧪 TEST STRUCTURE",
+    q: "What is the correct structure of a basic Playwright test file?",
+    code: `<span class="cmt">// test-file.spec.js — choose the correct structure:</span>`,
+    options: [
+      "import {test,expect} from '@playwright/test';\ntest('name', async ({page}) => { … })",
+      "describe('name', () => { it('test', (page) => { … }) })",
+      "const pw = require('playwright');\npw.test('name', () => { … })",
+      "test('name', (browser) => { const page=browser.page(); … })"
+    ],
+    answer: 0,
+    explain: "✅  Playwright test structure:\n  import { test, expect } from '@playwright/test';\n\n  test('description', async ({ page }) => {\n    // page is injected automatically as a fixture!\n    await page.goto('...');\n    await expect(page.getByText('Hello')).toBeVisible();\n  });\n\n  The async ({ page }) fixture pattern is key —\n  Playwright manages the page lifecycle for you."
+  },
+  {
+    level: "🧪 TEST STRUCTURE",
+    q: "How do you GROUP related tests together?",
+    code: `<span class="cmt">// Group login tests together:</span>
+<span class="var">test.describe</span>(<span class="str">'Login Flow'</span>, () => {
+  test(<span class="str">'valid login'</span>, <span class="kw">async</span> ({<span class="var">page</span>}) => { <span class="cmt">/* … */</span> });
+  test(<span class="str">'invalid login'</span>, <span class="kw">async</span> ({<span class="var">page</span>}) => { <span class="cmt">/* … */</span> });
+});
+<span class="cmt">// What does test.describe() do?</span>`,
+    options: [
+      "Groups tests and allows shared beforeEach/afterEach hooks within",
+      "Makes all tests inside run in parallel automatically",
+      "It's just a label — no functional difference",
+      "Describes a test so it shows in the HTML report only"
+    ],
+    answer: 0,
+    explain: "✅  test.describe() groups tests AND enables scoped hooks:\n\n  test.describe('Checkout', () => {\n    test.beforeEach(async ({ page }) => {\n      await page.goto('/cart'); // runs before EACH test in group\n    });\n    test('add item', ...);\n    test('remove item', ...);\n  });\n\n  Hooks only apply within their describe block!"
+  },
+
+  // ── HOOKS ──
+  {
+    level: "🔁 HOOKS & SETUP",
+    q: "Which hook runs ONCE before all tests in a describe block?",
+    code: `test.describe(<span class="str">'Orders'</span>, () => {
+  <span class="cmt">// Run setup ONCE before all tests:</span>
+  _______(<span class="kw">async</span> ({<span class="var">page</span>}) => {
+    <span class="kw">await</span> <span class="var">page</span>.goto(<span class="str">'/login'</span>);
+    <span class="kw">await</span> loginAsAdmin(<span class="var">page</span>);
+  });
+  test(<span class="str">'view orders'</span>, ...);
+  test(<span class="str">'create order'</span>, ...);
+});`,
+    options: [
+      "test.beforeAll",
+      "test.beforeEach",
+      "test.setup",
+      "test.before"
+    ],
+    answer: 0,
+    explain: "✅  Playwright hooks:\n  test.beforeAll(async ({ browser }) => {})  → runs ONCE before all\n  test.afterAll(async ({ browser }) => {})   → runs ONCE after all\n  test.beforeEach(async ({ page }) => {})    → runs before EACH test\n  test.afterEach(async ({ page }) => {})     → runs after EACH test\n\n  ⚠️  beforeAll gets 'browser' fixture, not 'page'!\n  Use it for expensive setup like creating a user in DB."
+  },
+
+  // ── TAGS ──
+  {
+    level: "🏷️ TAGS & FILTERS",
+    q: "How do you TAG a test as @smoke and run ONLY smoke tests?",
+    code: `<span class="cmt">// Tag the test:</span>
+test(<span class="str">'login works @smoke'</span>, <span class="kw">async</span> ({<span class="var">page</span>}) => { <span class="cmt">/* … */</span> });
+
+<span class="cmt">// Run command to execute only @smoke tests:</span>`,
+    options: [
+      "npx playwright test --grep @smoke",
+      "npx playwright test --tag smoke",
+      "npx playwright test --filter=smoke",
+      "npx playwright test smoke.spec.js"
+    ],
+    answer: 0,
+    explain: "✅  Tagging pattern in Playwright:\n\n  test('login @smoke @critical', async ({page}) => {...});\n\n  Run commands:\n  npx playwright test --grep @smoke      → only smoke tests\n  npx playwright test --grep-invert @smoke → SKIP smoke tests\n  npx playwright test --grep \"@smoke|@critical\"\n\n  Great for CI pipelines where you run smoke tests on every PR\n  but full regression only nightly!"
+  },
+];
+
+// ════════════════════════════════════════════════════════════════
+//  GAME STATE
+// ════════════════════════════════════════════════════════════════
+let currentQ = 0;
+let score = 0;
+let lives = 3;
+let answered = false;
+let marioX = 60;
+let marioJumping = false;
+let marioJumpV = 0;
+let marioBaseY = 0; // will be set after layout
+let marioY = 0;
+let animFrame = 0;
+
+const totalQ = QUESTIONS.length;
+document.getElementById('qTotal').textContent = totalQ;
+
+// ════════════════════════════════════════════════════════════════
+//  CANVAS BACKGROUND WORLD
+// ════════════════════════════════════════════════════════════════
+const bgCanvas = document.getElementById('worldCanvas');
+const bgCtx = bgCanvas.getContext('2d');
+let bgScroll = 0;
+
+function resizeBg(){
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+}
+resizeBg();
+window.addEventListener('resize', resizeBg);
+
+function drawBg(){
+  const W=bgCanvas.width, H=bgCanvas.height;
+  // Sky
+  const sky=bgCtx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#3a60c0'); sky.addColorStop(1,'#7ab0f0');
+  bgCtx.fillStyle=sky; bgCtx.fillRect(0,0,W,H);
+
+  // Clouds
+  bgCtx.fillStyle='rgba(255,255,255,0.7)';
+  [[100,60],[280,40],[460,70],[640,45],[820,65],[1000,50],[1200,60]].forEach(([cx,cy])=>{
+    const x=(cx-bgScroll*0.3)%W; // parallax
+    bgCtx.beginPath(); bgCtx.arc(x,cy,22,0,Math.PI*2); bgCtx.fill();
+    bgCtx.beginPath(); bgCtx.arc(x+28,cy-8,16,0,Math.PI*2); bgCtx.fill();
+    bgCtx.beginPath(); bgCtx.arc(x+50,cy,20,0,Math.PI*2); bgCtx.fill();
+    bgCtx.beginPath(); bgCtx.rect(x,cy,50,22); bgCtx.fill();
+  });
+
+  // Ground strip
+  bgCtx.fillStyle='#5dc44a'; bgCtx.fillRect(0,H-44,W,16);
+  bgCtx.fillStyle='#c8a050'; bgCtx.fillRect(0,H-28,W,28);
+  // ground tiles
+  for(let x=0;x<W;x+=32){
+    bgCtx.strokeStyle='#b08830'; bgCtx.lineWidth=1;
+    bgCtx.strokeRect(x,H-28,32,28);
+  }
+
+  // Floating bricks in bg (decorative)
+  bgCtx.fillStyle='#c0392b';
+  [[120,H-120],[200,H-140],[330,H-120],[500,H-150],[640,H-120],[750,H-140]].forEach(([bx,by])=>{
+    const sx=(bx-bgScroll*0.6)%W;
+    bgCtx.fillRect(sx,by,32,32);
+    bgCtx.strokeStyle='#922b21'; bgCtx.lineWidth=1;
+    bgCtx.strokeRect(sx,by,32,32);
+    bgCtx.strokeRect(sx,by+16,32,16);
+    bgCtx.strokeRect(sx+16,by,16,16);
+  });
+
+  bgScroll+=0.5;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MARIO SPRITE CANVAS
+// ════════════════════════════════════════════════════════════════
+const mCanvas = document.getElementById('marioSprite');
+const mCtx = mCanvas.getContext('2d');
+
+function drawMarioSprite(frame, jumping){
+  mCtx.clearRect(0,0,40,60);
+  const W=40,H=60;
+  // Hat
+  mCtx.fillStyle='#c0392b'; mCtx.fillRect(8,0,24,8);
+  mCtx.fillRect(4,8,32,6);
+  // Face
+  mCtx.fillStyle='#f5cba7'; mCtx.fillRect(8,14,24,14);
+  // Eyes
+  mCtx.fillStyle='#111'; mCtx.fillRect(12,16,4,4); mCtx.fillRect(24,16,4,4);
+  // Mustache
+  mCtx.fillStyle='#6d4c41'; mCtx.fillRect(10,24,20,4);
+  // Body
+  mCtx.fillStyle='#e03c28'; mCtx.fillRect(6,28,28,14);
+  // Overalls
+  mCtx.fillStyle='#2980b9'; mCtx.fillRect(8,30,24,14);
+  // Arms
+  mCtx.fillStyle='#e03c28';
+  const la = jumping ? -6 : Math.sin(frame*0.2)*4;
+  mCtx.fillRect(0, 28+la, 8, 12);
+  mCtx.fillRect(32, 28-la, 8, 12);
+  // Legs
+  mCtx.fillStyle='#2980b9';
+  const lkL = jumping ? -4 : Math.sin(frame*0.3)*5;
+  const lkR = jumping ? 4 : -Math.sin(frame*0.3)*5;
+  mCtx.fillRect(8, 44+lkL, 10, 10);
+  mCtx.fillRect(22, 44+lkR, 10, 10);
+  // Shoes
+  mCtx.fillStyle='#3d2b1f';
+  mCtx.fillRect(6, 52+Math.max(0,lkL), 12, 6);
+  mCtx.fillRect(22, 52+Math.max(0,lkR), 12, 6);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  MARIO PHYSICS
+// ════════════════════════════════════════════════════════════════
+function marioJump(){
+  if(!marioJumping){ marioJumping=true; marioJumpV=14; }
+}
+function updateMario(){
+  const sprite = document.getElementById('marioSprite');
+  const gameDiv = document.getElementById('game');
+  const baseBottom = 72; // above ground
+
+  if(marioJumping){
+    marioJumpV -= 1.2;
+    const newBottom = parseInt(sprite.style.bottom||baseBottom) + marioJumpV;
+    if(newBottom <= baseBottom){ sprite.style.bottom=baseBottom+'px'; marioJumping=false; marioJumpV=0; }
+    else sprite.style.bottom=newBottom+'px';
+  }
+  sprite.style.left = marioX+'px';
+  animFrame++;
+  drawMarioSprite(animFrame, marioJumping);
+}
+document.getElementById('marioSprite').style.bottom='72px';
+
+// ════════════════════════════════════════════════════════════════
+//  PARTICLES
+// ════════════════════════════════════════════════════════════════
+const particles=[];
+function spawnParticles(good){
+  const x=marioX+20, y=window.innerHeight-100;
+  for(let i=0;i<12;i++){
+    particles.push({
+      x,y,
+      vx:(Math.random()-0.5)*7,
+      vy:-(Math.random()*10+4),
+      life:40,
+      color:good?['#f1c40f','#27ae60','#fff'][Math.floor(Math.random()*3)]:['#e74c3c','#e67e22','#fff'][Math.floor(Math.random()*3)],
+      size:Math.random()*8+4
+    });
+  }
+}
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.5; p.life--;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+function drawParticles(){
+  for(const p of particles){
+    bgCtx.globalAlpha=p.life/40;
+    bgCtx.fillStyle=p.color;
+    bgCtx.fillRect(p.x,p.y,p.size,p.size);
+  }
+  bgCtx.globalAlpha=1;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  GAME LOOP
+// ════════════════════════════════════════════════════════════════
+function gameLoop(){
+  drawBg();
+  drawParticles();
+  updateParticles();
+  updateMario();
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+// ════════════════════════════════════════════════════════════════
+//  LOAD QUESTION
+// ════════════════════════════════════════════════════════════════
+function loadQuestion(){
+  if(currentQ >= totalQ){ showWin(); return; }
+  const q = QUESTIONS[currentQ];
+  answered = false;
+
+  document.getElementById('qNum').textContent = currentQ+1;
+  document.getElementById('topicBadge').textContent = `Q${currentQ+1}/${totalQ} — ${q.level}`;
+  document.getElementById('questionBox').innerHTML = q.q;
+
+  const cb = document.getElementById('codeBlock');
+  if(q.code){ cb.style.display='block'; cb.innerHTML=q.code; }
+  else cb.style.display='none';
+
+  const ad = document.getElementById('answers');
+  ad.innerHTML='';
+  q.options.forEach((opt,i)=>{
+    const btn=document.createElement('button');
+    btn.className='ans-btn';
+    btn.innerHTML=opt.replace(/\n/g,'<br>');
+    btn.onclick=()=>handleAnswer(i);
+    ad.appendChild(btn);
+  });
+
+  document.getElementById('explanation').classList.remove('show');
+  document.getElementById('explanation').style.display='none';
+  document.getElementById('nextBtn').classList.remove('show');
+
+  // Progress
+  document.getElementById('progress-bar').style.width=((currentQ/totalQ)*100)+'%';
+
+  // Mario walks to new position
+  marioX = 40 + (currentQ/(totalQ-1))*(window.innerWidth*0.18);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  HANDLE ANSWER
+// ════════════════════════════════════════════════════════════════
+function handleAnswer(idx){
+  if(answered) return;
+  answered=true;
+  const q=QUESTIONS[currentQ];
+  const btns=document.querySelectorAll('.ans-btn');
+  const correct=idx===q.answer;
+
+  btns[q.answer].classList.add('correct');
+  if(!correct){ btns[idx].classList.add('wrong'); }
+
+  // Disable all
+  btns.forEach(b=>b.style.pointerEvents='none');
+
+  // Score & lives
+  if(correct){
+    score+=100+(lives*10);
+    document.getElementById('scoreDisp').textContent=score;
+    marioJump();
+    showToast('✅ CORRECT! +100 pts','good');
+    spawnParticles(true);
+  } else {
+    lives=Math.max(0,lives-1);
+    updateLivesUI();
+    showToast('❌ WRONG! -1 Life','bad');
+    spawnParticles(false);
+    if(lives===0){ setTimeout(()=>showGameOver(),1200); return; }
+  }
+
+  // Explanation
+  const expEl=document.getElementById('explanation');
+  expEl.style.display='block';
+  expEl.textContent=q.explain;
+  expEl.classList.add('show');
+  document.getElementById('nextBtn').classList.add('show');
+}
+
+function updateLivesUI(){
+  const h='❤️'.repeat(lives)+'🖤'.repeat(3-lives);
+  document.getElementById('livesDisp').textContent=h;
+}
+
+// ════════════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, type){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show '+type;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.className='',2000);
+}
+
+// ════════════════════════════════════════════════════════════════
+//  WIN / GAME OVER
+// ════════════════════════════════════════════════════════════════
+function showWin(){
+  document.getElementById('progress-bar').style.width='100%';
+  const correct=QUESTIONS.length-(3-lives);
+  const pct=Math.round((correct/totalQ)*100);
+  document.getElementById('winCard').innerHTML=
+    `⭐ Final Score: <b style="color:#f1c40f">${score}</b><br>
+     ✅ Questions Correct: <b>${correct}/${totalQ}</b><br>
+     📊 Accuracy: <b>${pct}%</b><br>
+     ❤️ Lives Remaining: <b>${lives}</b><br><br>
+     <span style="font-size:10px;color:#adf">You are ready to write Playwright tests! 🎭</span>`;
+  document.getElementById('winScreen').style.display='flex';
+}
+
+function showGameOver(){
+  document.getElementById('winCard').innerHTML=
+    `💀 Game Over<br><br>Score: ${score}<br><br>
+    <span style="font-size:10px;color:#faa">Don't worry — review the cheat sheet<br>and try again! You've got this. 💪</span>`;
+  document.getElementById('winCard').style.borderColor='#e74c3c';
+  document.getElementById('winScreen').innerHTML=
+    `<h1 style="color:#e74c3c">💀 GAME OVER</h1>
+    <div class="score-card" style="border-color:#e74c3c">Score: ${score}<br><br>
+    <span style="font-size:10px;color:#faa">Review the cheat sheet & try again!</span></div>
+    <button id="restartBtn" onclick="restartGame()">🔄 TRY AGAIN</button>`;
+  document.getElementById('winScreen').style.display='flex';
+}
+
+// ════════════════════════════════════════════════════════════════
+//  BUTTONS
+// ════════════════════════════════════════════════════════════════
+document.getElementById('nextBtn').addEventListener('click',()=>{
+  currentQ++;
+  loadQuestion();
+});
+
+document.getElementById('startBtn').addEventListener('click',()=>{
+  document.getElementById('titleScreen').style.display='none';
+  loadQuestion();
+});
+
+function restartGame(){
+  currentQ=0; score=0; lives=3; marioX=40;
+  document.getElementById('scoreDisp').textContent=0;
+  document.getElementById('winScreen').style.display='none';
+  updateLivesUI();
+  loadQuestion();
+}
+document.getElementById('restartBtn').addEventListener('click', restartGame);
+
+// Keyboard shortcuts
+window.addEventListener('keydown',e=>{
+  if(e.key==='1'||e.key==='2'||e.key==='3'||e.key==='4'){
+    handleAnswer(parseInt(e.key)-1);
+  }
+  if(e.key==='Enter' && answered && document.getElementById('nextBtn').classList.contains('show')){
+    currentQ++; loadQuestion();
+  }
+});
+
+// Cheat sheet toggle
+document.getElementById('cheatToggle').addEventListener('click',()=>{
+  document.getElementById('cheatSheet').classList.toggle('open');
+});
+
+// ── Start ──
+updateLivesUI();
+</script>
+</body>
+</html>
